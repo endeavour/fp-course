@@ -21,6 +21,8 @@ import qualified Prelude as P
 -- >>> import Test.QuickCheck
 -- >>> import qualified Prelude as P(fmap)
 -- >>> instance Arbitrary a => Arbitrary (List a) where arbitrary = P.fmap listh arbitrary
+-- Could not find module `Test.QuickCheck'
+-- Use -v (or `:set -v` in ghci) to see a list of the files searched for.
 
 -- | A `StateT` is a function from a state value `s` to a functor k of (a produced value `a`, and a resulting state `s`).
 newtype StateT s k a =
@@ -45,8 +47,8 @@ instance Functor k => Functor (StateT s k) where
     (a -> b)
     -> StateT s k a
     -> StateT s k b
-  (<$>) =
-    error "todo: Course.StateT (<$>)#instance (StateT s k)"
+  (<$>) f st =
+    StateT(\s -> (\(a,s') -> (f a, s')) <$> runStateT st s)
 
 -- | Implement the `Applicative` instance for @StateT s k@ given a @Monad k@.
 --
@@ -68,14 +70,13 @@ instance Monad k => Applicative (StateT s k) where
   pure ::
     a
     -> StateT s k a
-  pure =
-    error "todo: Course.StateT pure#instance (StateT s k)"
+  pure x = StateT(\s -> pure (x,s))
   (<*>) ::
     StateT s k (a -> b)
     -> StateT s k a
     -> StateT s k b
-  (<*>) =
-    error "todo: Course.StateT (<*>)#instance (StateT s k)"
+  (<*>) f s = StateT(\s' -> let f' = runStateT f s'
+                            in f' >>= (\(mapA, s1) -> runStateT (mapA <$> s) s1))
 
 -- | Implement the `Monad` instance for @StateT s k@ given a @Monad k@.
 -- Make sure the state value is passed through in `bind`.
@@ -90,8 +91,10 @@ instance Monad k => Monad (StateT s k) where
     (a -> StateT s k b)
     -> StateT s k a
     -> StateT s k b
-  (=<<) =
-    error "todo: Course.StateT (=<<)#instance (StateT s k)"
+  (=<<) fas s =
+    StateT(\s' -> let x = runStateT s s'
+                      y = (\(a1,s1) -> runStateT (fas a1) s1) <$> x
+                      in join y)
 
 -- | A `State'` is `StateT` specialised to the `ExactlyOne` functor.
 type State' s a =
@@ -104,8 +107,7 @@ type State' s a =
 state' ::
   (s -> (a, s))
   -> State' s a
-state' =
-  error "todo: Course.StateT#state'"
+state' f = StateT(pure . f)
 
 -- | Provide an unwrapper for `State'` values.
 --
@@ -115,8 +117,7 @@ runState' ::
   State' s a
   -> s
   -> (a, s)
-runState' =
-  error "todo: Course.StateT#runState'"
+runState' sm s = runExactlyOne $ runStateT sm s
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting state.
 --
@@ -127,8 +128,7 @@ execT ::
   StateT s k a
   -> s
   -> k s
-execT =
-  error "todo: Course.StateT#execT"
+execT sm s = snd <$> runStateT sm s
 
 -- | Run the `State'` seeded with `s` and retrieve the resulting state.
 --
@@ -138,8 +138,7 @@ exec' ::
   State' s a
   -> s
   -> s
-exec' =
-  error "todo: Course.StateT#exec'"
+exec' sm s = snd $ runState' sm s
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting value.
 --
@@ -150,8 +149,8 @@ evalT ::
   StateT s k a
   -> s
   -> k a
-evalT =
-  error "todo: Course.StateT#evalT"
+evalT sm s =
+  fst <$> runStateT sm s
 
 -- | Run the `State'` seeded with `s` and retrieve the resulting value.
 --
@@ -161,8 +160,8 @@ eval' ::
   State' s a
   -> s
   -> a
-eval' =
-  error "todo: Course.StateT#eval'"
+eval' sm s =
+  fst $ runState' sm s
 
 -- | A `StateT` where the state also distributes into the produced value.
 --
@@ -172,7 +171,7 @@ getT ::
   Applicative k =>
   StateT s k s
 getT =
-  error "todo: Course.StateT#getT"
+  StateT(\s -> pure (s, s))
 
 -- | A `StateT` where the resulting state is seeded with the given value.
 --
@@ -185,8 +184,8 @@ putT ::
   Applicative k =>
   s
   -> StateT s k ()
-putT =
-  error "todo: Course.StateT#putT"
+putT s =
+  StateT(\_ -> pure((), s))  
 
 -- | Remove all duplicate elements in a `List`.
 --
