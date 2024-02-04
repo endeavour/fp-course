@@ -13,6 +13,7 @@ import Course.Functor
 import Course.Applicative
 import Course.Monad
 import qualified Data.Set as S
+import Control.Monad.ST (runST)
 
 -- $setup
 -- >>> import Test.QuickCheck.Function
@@ -22,6 +23,8 @@ import qualified Data.Set as S
 -- >>> import Course.Core
 -- >>> import Course.List
 -- >>> instance Arbitrary a => Arbitrary (List a) where arbitrary = P.fmap listh arbitrary
+-- Could not find module `Test.QuickCheck.Function'
+-- Use -v (or `:set -v` in ghci) to see a list of the files searched for.
 
 -- A `State` is a function from a state value `s` to (a produced value `a`, and a resulting state `s`).
 newtype State s a =
@@ -44,8 +47,7 @@ exec ::
   State s a
   -> s
   -> s
-exec =
-  error "todo: Course.State#exec"
+exec sm s = snd $ runState sm s
 
 -- | Run the `State` seeded with `s` and retrieve the resulting value.
 --
@@ -54,8 +56,7 @@ eval ::
   State s a
   -> s
   -> a
-eval =
-  error "todo: Course.State#eval"
+eval sm s = fst $ runState sm s
 
 -- | A `State` where the state also distributes into the produced value.
 --
@@ -63,8 +64,7 @@ eval =
 -- (0,0)
 get ::
   State s s
-get =
-  error "todo: Course.State#get"
+get = State (\s -> (s,s))
 
 -- | A `State` where the resulting state is seeded with the given value.
 --
@@ -73,20 +73,21 @@ get =
 put ::
   s
   -> State s ()
-put =
-  error "todo: Course.State#put"
+put s = State (P.const ((), s))
 
 -- | Implement the `Functor` instance for `State s`.
 --
 -- >>> runState ((+1) <$> State (\s -> (9, s * 2))) 3
--- (10,6)
+-- WAS WAS WAS (10,6)
+-- WAS WAS NOW (10,3)
+-- WAS NOW (10,6)
+-- NOW (10,6)
 instance Functor (State s) where
   (<$>) ::
     (a -> b)
     -> State s a
     -> State s b
-  (<$>) =
-    error "todo: Course.State#(<$>)"
+  (<$>) f sa = State (\s -> let a = eval sa s in (f a,exec sa s))
 
 -- | Implement the `Applicative` instance for `State s`.
 --
@@ -97,19 +98,40 @@ instance Functor (State s) where
 -- (1,0)
 --
 -- >>> runState (State (\s -> ((+3), s ++ ("apple":.Nil))) <*> State (\s -> (7, s ++ ("banana":.Nil)))) Nil
--- (10,["apple","banana"])
+-- WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS (10,["apple","banana"])
+-- WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS NOW (10,[])
+-- WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS NOW (10,["apple"])
+-- WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS NOW (10,["banana"])
+-- WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS NOW (10,["banana"])
+-- WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS NOW (10,["apple","banana"])
+-- WAS WAS WAS WAS WAS WAS WAS WAS WAS WAS NOW (10,["apple","banana"])
+-- WAS WAS WAS WAS WAS WAS WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS WAS WAS WAS WAS WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS WAS WAS WAS WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS WAS WAS WAS WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS WAS WAS WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS WAS WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS WAS NOW (10,["banana","apple"])
+-- WAS WAS NOW (10,["apple"])
+-- WAS NOW (10,["apple"])
+-- NOW (10,["apple","banana"])
 instance Applicative (State s) where
   pure ::
     a
     -> State s a
-  pure =
-    error "todo: Course.State pure#instance (State s)"
+  pure a = State (\s -> (a, s))
   (<*>) ::
     State s (a -> b)
     -> State s a
     -> State s b
-  (<*>) =
-    error "todo: Course.State (<*>)#instance (State s)"
+  State f <*> State a =
+    State (\s1 -> let (p,q) = f s1
+                      (u,v) = a q
+                      in (p u, v))
 
 -- | Implement the `Monad` instance for `State s`.
 --
@@ -126,8 +148,8 @@ instance Monad (State s) where
     (a -> State s b)
     -> State s a
     -> State s b
-  (=<<) =
-    error "todo: Course.State (=<<)#instance (State s)"
+  (=<<) fa (State sa) = State (\s -> let (a,b) = sa s
+                                         in runState (fa a) b)
 
 -- | Find the first element in a `List` that satisfies a given predicate.
 -- It is possible that no element is found, hence an `Optional` result.
@@ -148,8 +170,11 @@ findM ::
   (a -> f Bool)
   -> List a
   -> f (Optional a)
-findM =
-  error "todo: Course.State#findM"
+findM _ Nil = pure Empty
+findM p (h :. t) =
+  p h >>= (\q -> if q then pure (Full h) else findM p t)
+
+
 
 -- | Find the first element in a `List` that repeats.
 -- It is possible that no element repeats, hence an `Optional` result.
@@ -165,22 +190,32 @@ firstRepeat ::
   Ord a =>
   List a
   -> Optional a
-firstRepeat =
-  error "todo: Course.State#firstRepeat"
+firstRepeat xs =
+  eval (findM containsEl xs) S.empty
+    --initialState :: State (Set a) a
 
 -- | Remove all duplicate elements in a `List`.
 -- /Tip:/ Use `filtering` and `State` with a @Data.Set#Set@.
 --
 -- prop> \xs -> firstRepeat (distinct xs) == Empty
+-- Add QuickCheck to your cabal dependencies to run this test.
 --
 -- prop> \xs -> distinct xs == distinct (flatMap (\x -> x :. x :. Nil) xs)
+-- Add QuickCheck to your cabal dependencies to run this test.
 distinct ::
   Ord a =>
   List a
   -> List a
-distinct =
-  error "todo: Course.State#distinct"
+distinct xs =
+  let foo = filtering (\x -> (not) <$> containsEl x) xs
+      in eval foo S.empty
 
+
+
+containsEl :: Ord a => a -> State (S.Set a) Bool
+containsEl x = State (\s -> let newState = S.insert x s
+                                containsElement = S.member x s
+                                in (containsElement,newState))
 -- | A happy number is a positive integer, where the sum of the square of its digits eventually reaches 1 after repetition.
 -- In contrast, a sad number (not a happy number) is where the sum of the square of its digits never reaches 1
 -- because it results in a recurring sequence.
@@ -205,5 +240,24 @@ distinct =
 isHappy ::
   Integer
   -> Bool
-isHappy =
-  error "todo: Course.State#isHappy"
+isHappy n =
+
+  case firstRepeat (genSeq n) of
+    Full 1 -> True
+    _ -> False
+
+  where
+    genSeq :: Integer -> List Integer
+    genSeq = produce (\x -> sum $ square <$> digits x)
+
+    square :: Integer -> Integer
+    square x = x * x
+
+    digits :: Integer -> List Integer
+    digits n =
+      if n <= 9
+        then n :. Nil
+        else
+          let lastDigit = n `P.mod` 10
+              remaining = n `P.div` 10
+              in lastDigit :. digits remaining

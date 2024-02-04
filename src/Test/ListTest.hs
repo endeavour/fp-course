@@ -82,7 +82,7 @@ sumTest =
     testCase "sum 1..3" $ sum (1 :. 2 :. 3 :. Nil) @?= 6
   , testCase "sum 1..4" $ sum (1 :. 2 :. 3 :. 4 :. Nil) @?= 10
   , testProperty "subtracting each element in a list from its sum is always 0" $ \x ->
-      foldLeft (-) (sum x) x == 0
+      foldLeft (-) (sum x) (x :: List Integer) == 0
   ]
 
 lengthTest :: TestTree

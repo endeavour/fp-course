@@ -20,12 +20,13 @@ bindExactlyOne :: (a -> ExactlyOne b) -> ExactlyOne a -> ExactlyOne b
 bindExactlyOne f (ExactlyOne a) = f a
 
 instance P.Functor ExactlyOne where
-  fmap =
-    M.liftM
+  fmap = M.liftM
 
 instance A.Applicative ExactlyOne where
+  (<*>) :: ExactlyOne (a -> b) -> ExactlyOne a -> ExactlyOne b
   (<*>) =
     M.ap
+  pure :: a -> ExactlyOne a
   pure =
     ExactlyOne
 

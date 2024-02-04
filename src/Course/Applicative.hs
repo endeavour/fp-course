@@ -41,6 +41,7 @@ infixl 4 <*>
 -- | Insert into ExactlyOne.
 --
 -- prop> \x -> pure x == ExactlyOne x
+-- Add QuickCheck to your cabal dependencies to run this test.
 --
 -- >>> ExactlyOne (+10) <*> ExactlyOne 8
 -- ExactlyOne 18
@@ -48,14 +49,12 @@ instance Applicative ExactlyOne where
   pure ::
     a
     -> ExactlyOne a
-  pure =
-    error "todo: Course.Applicative pure#instance ExactlyOne"
+  pure = ExactlyOne
   (<*>) ::
     ExactlyOne (a -> b)
     -> ExactlyOne a
     -> ExactlyOne b
-  (<*>) =
-    error "todo: Course.Applicative (<*>)#instance ExactlyOne"
+  (<*>) (ExactlyOne f) (ExactlyOne a) = pure (f a)
 
 -- | Insert into a List.
 --
@@ -67,14 +66,12 @@ instance Applicative List where
   pure ::
     a
     -> List a
-  pure =
-    error "todo: Course.Applicative pure#instance List"
+  pure x = x :. Nil
   (<*>) ::
     List (a -> b)
     -> List a
     -> List b
-  (<*>) =
-    error "todo: Course.Apply (<*>)#instance List"
+  (<*>) fs xs = flatMap (`map` xs) fs
 
 -- | Insert into an Optional.
 --
@@ -92,14 +89,14 @@ instance Applicative Optional where
   pure ::
     a
     -> Optional a
-  pure =
-    error "todo: Course.Applicative pure#instance Optional"
+  pure = Full
   (<*>) ::
     Optional (a -> b)
     -> Optional a
     -> Optional b
-  (<*>) =
-    error "todo: Course.Apply (<*>)#instance Optional"
+  (<*>) Empty _ = Empty
+  (<*>) _ Empty = Empty
+  (<*>) (Full f) (Full x) = pure (f x)
 
 -- | Insert into a constant function.
 --
@@ -119,47 +116,77 @@ instance Applicative Optional where
 -- 15
 --
 -- prop> \x y -> pure x y == x
+-- Add QuickCheck to your cabal dependencies to run this test.
+-- WAS Add QuickCheck to your cabal dependencies to run this test.
 instance Applicative ((->) t) where
   pure ::
     a
     -> ((->) t a)
-  pure =
-    error "todo: Course.Applicative pure#((->) t)"
+  pure = const
   (<*>) ::
     ((->) t (a -> b))
     -> ((->) t a)
     -> ((->) t b)
-  (<*>) =
-    error "todo: Course.Apply (<*>)#instance ((->) t)"
+  (<*>) ff fa t = let f = ff t in f (fa t)
 
 
 -- | Apply a binary function in the environment.
 --
 -- >>> lift2 (+) (ExactlyOne 7) (ExactlyOne 8)
--- ExactlyOne 15
+-- WAS WAS WAS WAS WAS ExactlyOne 15
+-- WAS WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS NOW ExactlyOne 15
+-- WAS NOW ExactlyOne 15
+-- NOW ExactlyOne 15
 --
 -- >>> lift2 (+) (1 :. 2 :. 3 :. Nil) (4 :. 5 :. Nil)
--- [5,6,6,7,7,8]
+-- WAS WAS WAS WAS WAS [5,6,6,7,7,8]
+-- WAS WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS NOW [5,6,6,7,7,8]
+-- WAS NOW [5,6,6,7,7,8]
+-- NOW [5,6,6,7,7,8]
 --
 -- >>> lift2 (+) (Full 7) (Full 8)
--- Full 15
+-- WAS WAS WAS WAS WAS Full 15
+-- WAS WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS NOW Full 15
+-- WAS NOW Full 15
+-- NOW Full 15
 --
 -- >>> lift2 (+) (Full 7) Empty
--- Empty
+-- WAS WAS WAS WAS WAS Empty
+-- WAS WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS NOW Empty
+-- WAS NOW Empty
+-- NOW Empty
 --
 -- >>> lift2 (+) Empty (Full 8)
--- Empty
+-- WAS WAS WAS WAS WAS Empty
+-- WAS WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS NOW Empty
+-- WAS NOW Empty
+-- NOW Empty
 --
 -- >>> lift2 (+) length sum (listh [4,5,6])
--- 18
+-- WAS WAS WAS WAS WAS 18
+-- WAS WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS WAS NOW todo: Course.Applicative#lift2
+-- WAS WAS NOW 18
+-- WAS NOW 18
+-- NOW 18
 lift2 ::
   Applicative k =>
   (a -> b -> c)
   -> k a
   -> k b
   -> k c
-lift2 =
-  error "todo: Course.Applicative#lift2"
+lift2 fabc ka kb =
+  (fabc <$> ka) <*> kb
 
 -- | Apply a ternary function in the environment.
 -- /can be written using `lift2` and `(<*>)`./
@@ -191,8 +218,7 @@ lift3 ::
   -> k b
   -> k c
   -> k d
-lift3 =
-  error "todo: Course.Applicative#lift3"
+lift3 fabcd ka kb kc = lift2 fabcd ka kb <*> kc
 
 -- | Apply a quaternary function in the environment.
 -- /can be written using `lift3` and `(<*>)`./
@@ -225,16 +251,15 @@ lift4 ::
   -> k c
   -> k d
   -> k e
-lift4 =
-  error "todo: Course.Applicative#lift4"
+lift4 fabcde ka kb kc kd =
+  let x = lift3 fabcde ka kb kc in x <*> kd
 
 -- | Apply a nullary function in the environment.
 lift0 ::
   Applicative k =>
   a
   -> k a
-lift0 =
-  error "todo: Course.Applicative#lift0"
+lift0 = pure
 
 -- | Apply a unary function in the environment.
 -- /can be written using `lift0` and `(<*>)`./
@@ -253,33 +278,40 @@ lift1 ::
   -> k a
   -> k b
 lift1 =
-  error "todo: Course.Applicative#lift1"
+  (<*>) . lift0
 
 -- | Apply, discarding the value of the first argument.
 -- Pronounced, right apply.
 --
 -- >>> (1 :. 2 :. 3 :. Nil) *> (4 :. 5 :. 6 :. Nil)
--- [4,5,6,4,5,6,4,5,6]
+-- WAS WAS [4,5,6,4,5,6,4,5,6]
+-- WAS NOW [4,5,6]
+-- NOW [4,5,6,4,5,6,4,5,6]
 --
 -- >>> (1 :. 2 :. Nil) *> (4 :. 5 :. 6 :. Nil)
--- [4,5,6,4,5,6]
+-- WAS WAS [4,5,6,4,5,6]
+-- WAS NOW [4,5,6]
+-- NOW [4,5,6,4,5,6]
 --
 -- >>> (1 :. 2 :. 3 :. Nil) *> (4 :. 5 :. Nil)
--- [4,5,4,5,4,5]
+-- WAS WAS [4,5,4,5,4,5]
+-- WAS NOW [4,5]
+-- NOW [4,5,4,5,4,5]
 --
 -- >>> Full 7 *> Full 8
 -- Full 8
 --
 -- prop> \a b c x y z -> (a :. b :. c :. Nil) *> (x :. y :. z :. Nil) == (x :. y :. z :. x :. y :. z :. x :. y :. z :. Nil)
+-- Add QuickCheck to your cabal dependencies to run this test.
 --
 -- prop> \x y -> Full x *> Full y == Full y
+-- Add QuickCheck to your cabal dependencies to run this test.
 (*>) ::
   Applicative k =>
   k a
   -> k b
   -> k b
-(*>) =
-  error "todo: Course.Applicative#(*>)"
+(*>) = lift2 (\_ b -> b)
 
 -- | Apply, discarding the value of the second argument.
 -- Pronounced, left apply.
@@ -297,15 +329,16 @@ lift1 =
 -- Full 7
 --
 -- prop> \x y z a b c -> (x :. y :. z :. Nil) <* (a :. b :. c :. Nil) == (x :. x :. x :. y :. y :. y :. z :. z :. z :. Nil)
+-- Add QuickCheck to your cabal dependencies to run this test.
 --
 -- prop> \x y -> Full x <* Full y == Full x
+-- Add QuickCheck to your cabal dependencies to run this test.
 (<*) ::
   Applicative k =>
   k b
   -> k a
   -> k b
-(<*) =
-  error "todo: Course.Applicative#(<*)"
+(<*) = lift2 const
 
 -- | Sequences a list of structures to a structure of list.
 --
@@ -327,34 +360,49 @@ sequence ::
   Applicative k =>
   List (k a)
   -> k (List a)
-sequence =
-  error "todo: Course.Applicative#sequence"
+sequence  = foldRight (lift2 (:.)) (pure Nil)
 
 -- | Replicate an effect a given number of times.
 --
 -- /Tip:/ Use `Course.List#replicate`.
 --
 -- >>> replicateA 4 (ExactlyOne "hi")
--- ExactlyOne ["hi","hi","hi","hi"]
+-- WAS WAS WAS ExactlyOne ["hi","hi","hi","hi"]
+-- WAS WAS NOW todo: Course.Applicative#sequence
+-- WAS NOW ExactlyOne ["hi","hi","hi","hi"]
+-- NOW ExactlyOne ["hi","hi","hi","hi"]
 --
 -- >>> replicateA 4 (Full "hi")
--- Full ["hi","hi","hi","hi"]
+-- WAS WAS WAS Full ["hi","hi","hi","hi"]
+-- WAS WAS NOW todo: Course.Applicative#sequence
+-- WAS NOW Full ["hi","hi","hi","hi"]
+-- NOW Full ["hi","hi","hi","hi"]
 --
 -- >>> replicateA 4 Empty
--- Empty
+-- WAS WAS WAS Empty
+-- WAS WAS NOW todo: Course.Applicative#sequence
+-- WAS NOW Empty
+-- NOW Empty
 --
 -- >>> replicateA 4 (*2) 5
--- [10,10,10,10]
+-- WAS WAS WAS [10,10,10,10]
+-- WAS WAS NOW todo: Course.Applicative#sequence
+-- WAS NOW [10,10,10,10]
+-- NOW [10,10,10,10]
 --
 -- >>> replicateA 3 ('a' :. 'b' :. 'c' :. Nil)
--- ["aaa","aab","aac","aba","abb","abc","aca","acb","acc","baa","bab","bac","bba","bbb","bbc","bca","bcb","bcc","caa","cab","cac","cba","cbb","cbc","cca","ccb","ccc"]
+-- WAS WAS WAS ["aaa","aab","aac","aba","abb","abc","aca","acb","acc","baa","bab","bac","bba","bbb","bbc","bca","bcb","bcc","caa","cab","cac","cba","cbb","cbc","cca","ccb","ccc"]
+-- WAS WAS NOW todo: Course.Applicative#sequence
+-- WAS NOW ["aaa","aab","aac","aba","abb","abc","aca","acb","acc","baa","bab","bac","bba","bbb","bbc","bca","bcb","bcc","caa","cab","cac","cba","cbb","cbc","cca","ccb","ccc"]
+-- NOW ["aaa","aab","aac","aba","abb","abc","aca","acb","acc","baa","bab","bac","bba","bbb","bbc","bca","bcb","bcc","caa","cab","cac","cba","cbb","cbc","cca","ccb","ccc"]
 replicateA ::
   Applicative k =>
   Int
   -> k a
   -> k (List a)
-replicateA =
-  error "todo: Course.Applicative#replicateA"
+replicateA n fa =
+  let fas = replicate n fa
+  in sequence fas
 
 -- | Filter a list with a predicate that produces an effect.
 --
@@ -381,8 +429,18 @@ filtering ::
   (a -> k Bool)
   -> List a
   -> k (List a)
-filtering =
-  error "todo: Course.Applicative#filtering"
+filtering p xs =
+
+  let filtered = map (\x -> let match = p x in f match x) xs
+  in foldRight (\x acc -> ((++) <$> x) <*> acc) (pure Nil) filtered
+
+  where
+    f :: Functor k => k Bool -> a -> k (List a)
+    f match x = (\m -> if m then x :. Nil else Nil) <$> match
+
+
+
+
 
 -----------------------
 -- SUPPORT LIBRARIES --
