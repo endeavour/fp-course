@@ -242,16 +242,14 @@ isHappy ::
   -> Bool
 isHappy n =
 
-  case firstRepeat (genSeq n) of
-    Full 1 -> True
-    _ -> False
+  contains 1 $ firstRepeat (genSeq n)
 
   where
     genSeq :: Integer -> List Integer
     genSeq = produce (\x -> sum $ square <$> digits x)
 
     square :: Integer -> Integer
-    square x = x * x
+    square = join (*)
 
     digits :: Integer -> List Integer
     digits n =
